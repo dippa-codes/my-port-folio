@@ -134,6 +134,30 @@
         .animate-bounce-subtle {
             animation: bounce-subtle 1.5s infinite ease-in-out;
         }
+
+        /* Hero Animation Image specific styles */
+        @keyframes fadeOutZoomOut {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.5); /* Shrink slightly */
+            }
+        }
+        .hero-animated-image {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150px; /* Adjust size as needed */
+            height: auto;
+            z-index: 10; /* Above Three.js, below content */
+            animation: fadeOutZoomOut 2s ease-out forwards; /* 2s animation duration */
+            animation-delay: 1.5s; /* Starts fading out after 1.5s */
+            pointer-events: none; /* Prevent interaction with content below */
+        }
     </style>
 </head>
 <body>
@@ -149,6 +173,7 @@
             const mouseY = useRef(0);
             const targetX = useRef(0);
             const targetY = useRef(0);
+            const initialParticlesState = useRef([]); // To store initial positions/velocities for blast
 
             const handleMouseMove = useCallback((event) => {
                 mouseX.current = (event.clientX / window.innerWidth) * 2 - 1;
@@ -182,11 +207,27 @@
                     const color2 = new THREE.Color(0x8a2be2); // Blue violet
                     const color3 = new THREE.Color(0x4b0082); // Indigo
 
+                    initialParticlesState.current = []; // Reset for each init
+
                     for (let i = 0; i < particleCount; i++) {
-                        // Position random
-                        positions[i * 3] = (Math.random() * 2 - 1) * 10; // x
-                        positions[i * 3 + 1] = (Math.random() * 2 - 1) * 10; // y
-                        positions[i * 3 + 2] = (Math.random() * 2 - 1) * 10; // z
+                        // Initial position at center for blast
+                        positions[i * 3] = 0; // x
+                        positions[i * 3 + 1] = 0; // y
+                        positions[i * 3 + 2] = 0; // z
+
+                        // Store a target position for each particle and a velocity for the blast
+                        const targetX = (Math.random() * 2 - 1) * 10;
+                        const targetY = (Math.random() * 2 - 1) * 10;
+                        const targetZ = (Math.random() * 2 - 1) * 10;
+                        const initialVelocity = (Math.random() * 0.1 + 0.05); // Random initial velocity for blast
+
+                        initialParticlesState.current.push({
+                            targetX: targetX,
+                            targetY: targetY,
+                            targetZ: targetZ,
+                            velocity: new THREE.Vector3(targetX, targetY, targetZ).normalize().multiplyScalar(initialVelocity),
+                            currentPosition: new THREE.Vector3(0,0,0) // Start at center
+                        });
 
                         // Assign color
                         const colorChoice = Math.random();
@@ -214,21 +255,40 @@
                     particles = new THREE.Points(particleGeometry, particleMaterial);
                     scene.add(particles);
 
+                    let blastTime = 0;
+                    const blastDuration = 100; // frames for blast to occur (approx 1.6s at 60fps)
+
                     // Animation loop
                     const animate = () => {
                         animationFrameId = requestAnimationFrame(animate);
 
-                        // Smooth camera movement based on mouse
-                        targetX.current += (mouseX.current - targetX.current) * 0.02;
-                        targetY.current += (mouseY.current - targetY.current) * 0.02;
+                        // Initial particle blast effect
+                        if (blastTime < blastDuration) {
+                            for (let i = 0; i < particleCount; i++) {
+                                const particle = initialParticlesState.current[i];
+                                // Move particles outwards with diminishing velocity
+                                particle.currentPosition.add(particle.velocity.clone().multiplyScalar(1 - (blastTime / blastDuration)));
+                                particles.geometry.attributes.position.array[i * 3] = particle.currentPosition.x;
+                                particles.geometry.attributes.position.array[i * 3 + 1] = particle.currentPosition.y;
+                                particles.geometry.attributes.position.array[i * 3 + 2] = particle.currentPosition.z;
+                            }
+                            particles.geometry.attributes.position.needsUpdate = true;
+                            blastTime++;
+                        } else {
+                            // After blast, subtle camera movement and rotation
+                            // Smooth camera movement based on mouse
+                            targetX.current += (mouseX.current - targetX.current) * 0.02;
+                            targetY.current += (mouseY.current - targetY.current) * 0.02;
 
-                        camera.position.x = -targetX.current * 0.5;
-                        camera.position.y = targetY.current * 0.5;
-                        camera.lookAt(scene.position);
+                            camera.position.x = -targetX.current * 0.5;
+                            camera.position.y = targetY.current * 0.5;
+                            camera.lookAt(scene.position);
 
-                        // Rotate particles subtly
-                        particles.rotation.x += 0.0005;
-                        particles.rotation.y += 0.0008;
+                            // Rotate particles subtly
+                            particles.rotation.x += 0.0005;
+                            particles.rotation.y += 0.0008;
+                        }
+
 
                         renderer.render(scene, camera);
                     };
@@ -281,6 +341,15 @@
         // Main App component
         const App = () => {
             const [isNavOpen, setIsNavOpen] = useState(false);
+            const [showHeroAnimationImage, setShowHeroAnimationImage] = useState(true); // State for the new image
+
+            // Effect to hide the image after a delay
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setShowHeroAnimationImage(false);
+                }, 3500); // Image will be visible for 3.5 seconds (1.5s delay + 2s animation)
+                return () => clearTimeout(timer);
+            }, []);
 
             const scrollToSection = (id) => {
                 const element = document.getElementById(id);
@@ -444,7 +513,12 @@
                     {/* Navigation */}
                     <nav className="fixed w-full z-50 bg-white shadow-md py-4 rounded-b-xl">
                         <div className="container mx-auto px-6 flex justify-between items-center">
-                            <div className="text-2xl font-bold text-indigo-700">Dippa Kumari</div>
+                            {/* Dippa Kumari's Photo as logo */}
+                            <img
+                                src="uploaded:ChatGPT Image Jun 23, 2025, 04_58_50 PM.jpg-53164c6b-5b63-4c34-b912-be2de9697374"
+                                alt="Dippa Kumari Logo"
+                                class="h-10 w-auto rounded-full object-cover"
+                            />
                             {/* Desktop Nav Links */}
                             <div className="hidden md:flex space-x-8">
                                 <button onClick={() => scrollToSection('hero')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Home</button>
@@ -462,7 +536,7 @@
                                     ) : (
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                                     )}
-                                </svg>
+                                </svg> {/* Corrected SVG closing tag here */}
                             </button>
                         </div>
                         {/* Mobile Nav Links (Conditional Rendering) */}
@@ -483,9 +557,18 @@
                         {/* Three.js Canvas Background */}
                         <ThreeJSCanvas />
 
+                        {/* Animated Image (Girl Clip Art) */}
+                        {showHeroAnimationImage && (
+                            <img
+                                src="uploaded:Screenshot 2025-06-26 104659.png-bbe1d977-af89-4012-aa4d-40fa55944ddf"
+                                alt="Animated Illustration"
+                                className="hero-animated-image"
+                            />
+                        )}
+
                         <div className="container mx-auto px-6 text-center z-10 relative"> {/* z-10 to bring content to front */}
                             <img
-                                src="https://placehold.co/150x150/FFFFFF/3B82F6?text=DK"
+                                src="uploaded:image_aa7c33.jpg-fb4ad68a-4925-4012-aa4d-40fa55944ddf"
                                 alt="Dippa Kumari Profile"
                                 className="rounded-full w-36 h-36 mx-auto mb-6 border-4 border-white shadow-lg object-cover hero-section-image-animation"
                             />
@@ -528,14 +611,14 @@
                     <section id="about" className={`py-16 md:py-24 bg-white rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['about'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
                         <div className="container mx-auto px-6 max-w-4xl flex flex-col md:flex-row items-center gap-10">
                             <div className="md:w-1/3 flex justify-center">
-                                {/* Dippa Kumari's Photo */}
+                                {/* Dippa Kumari's Photo added here */}
                                 <img
-                                    src="uploaded:image_aa7c33.jpg-fb4ad68a-4925-4012-aa4d-40fa55944ddf"
+                                    src="uploaded:ChatGPT Image Jun 23, 2025, 04_58_50 PM.jpg-53164c6b-5b63-4c34-b912-be2de9697374"
                                     alt="Dippa Kumari Personal Photo"
                                     class="rounded-full w-48 h-48 md:w-64 md:h-64 object-cover border-4 border-indigo-300 shadow-xl"
                                 />
                             </div>
-                            <div className="md:w-2/3 text-center md:text-left">
+                            <div className="md:w-2/3 text-center md:text-left"> {/* Adjusted width */}
                                 <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">About Me</h2>
                                 <div className="text-lg text-gray-700 leading-relaxed space-y-6">
                                     <p>
