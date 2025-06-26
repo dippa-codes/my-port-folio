@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dippa Kumari - Professional Portfolio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- React and ReactDOM CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX transformation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- D3.js CDN for data visualization and animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <!-- Three.js CDN for 3D graphics (WebGL/OpenGL equivalent) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f6; /* Light greyish background */
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        /* Hero Section Animations (on page load) */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .animate-fade-in-down { animation: fadeInDown 1s ease-out forwards; }
+        .animate-fade-in-up { animation: fadeInUp 1s ease-out forwards; }
+        .animate-fade-in-up.delay-200 { animation-delay: 0.2s; }
+        .animate-fade-in-up.delay-400 { animation-delay: 0.4s; }
+        .animate-fade-in-up.delay-600 { animation-delay: 0.6s; }
+        .hero-section-image-animation { animation: fadeIn 1.2s ease-out forwards; }
+
+        /* Scroll-triggered Animations for sections */
+        @keyframes slideInUpSection {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInSection {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .animated-section-on-scroll {
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0s, transform 0s; /* No transition before animation */
+        }
+
+        .animated-section-on-scroll.is-visible.slide-up {
+            animation: slideInUpSection 0.8s ease-out forwards;
+        }
+
+        .animated-section-on-scroll.is-visible.fade-in {
+            animation: fadeInSection 1s ease-out forwards;
+        }
+
+        /* Animations for individual list items (bullet points) */
+        @keyframes slideInListItem {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .animated-list-item {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        .animated-list-item.animate { /* This class added when parent section is visible */
+            animation: slideInListItem 0.6s ease-out forwards;
+        }
+
+        /* Staggered delays for list items */
+        .li-delay-100 { animation-delay: 0.1s; }
+        .li-delay-200 { animation-delay: 0.2s; }
+        .li-delay-300 { animation-delay: 0.3s; }
+        .li-delay-400 { animation-delay: 0.4s; }
+        .li-delay-500 { animation-delay: 0.5s; }
+        .li-delay-600 { animation-delay: 0.6s; }
+        .li-delay-700 { animation-delay: 0.7s; }
+
+        /* D3.js Specific Styles */
+        .d3-circle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 3rem;
+            width: 100%; /* Ensure responsiveness */
+        }
+        .d3-circle-label {
+            font-weight: 700;
+            font-size: 1.5rem; /* Larger font size */
+            color: #4338ca; /* Indigo 700 */
+        }
+        .d3-circle-sublabel {
+            font-size: 0.9rem;
+            color: #6b7280; /* Gray 500 */
+        }
+
+        /* Three.js Canvas Styling */
+        #threejs-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Ensures it stays behind content */
+            opacity: 0.7; /* Make it subtle */
+        }
+
+        /* Animation for the "motion" icon */
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .animate-bounce-subtle {
+            animation: bounce-subtle 1.5s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- Three.js Background Component ---
+        const ThreeJSCanvas = () => {
+            const mountRef = useRef(null);
+            const mouseX = useRef(0);
+            const mouseY = useRef(0);
+            const targetX = useRef(0);
+            const targetY = useRef(0);
+
+            const handleMouseMove = useCallback((event) => {
+                mouseX.current = (event.clientX / window.innerWidth) * 2 - 1;
+                mouseY.current = -(event.clientY / window.innerHeight) * 2 + 1;
+            }, []);
+
+            useEffect(() => {
+                let camera, scene, renderer, particles, particleMaterial;
+                let animationFrameId;
+
+                const init = () => {
+                    // Scene
+                    scene = new THREE.Scene();
+
+                    // Camera
+                    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    camera.position.z = 5;
+
+                    // Renderer
+                    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // alpha: true for transparent background
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    mountRef.current.appendChild(renderer.domElement);
+                    renderer.domElement.id = 'threejs-canvas'; // Assign ID for styling
+
+                    // Particles
+                    const particleCount = 2000;
+                    const positions = new Float32Array(particleCount * 3);
+                    const colors = new Float32Array(particleCount * 3);
+
+                    const color1 = new THREE.Color(0x6a0dad); // Dark purple
+                    const color2 = new THREE.Color(0x8a2be2); // Blue violet
+                    const color3 = new THREE.Color(0x4b0082); // Indigo
+
+                    for (let i = 0; i < particleCount; i++) {
+                        // Position random
+                        positions[i * 3] = (Math.random() * 2 - 1) * 10; // x
+                        positions[i * 3 + 1] = (Math.random() * 2 - 1) * 10; // y
+                        positions[i * 3 + 2] = (Math.random() * 2 - 1) * 10; // z
+
+                        // Assign color
+                        const colorChoice = Math.random();
+                        if (colorChoice < 0.33) {
+                            color1.toArray(colors, i * 3);
+                        } else if (colorChoice < 0.66) {
+                            color2.toArray(colors, i * 3);
+                        } else {
+                            color3.toArray(colors, i * 3);
+                        }
+                    }
+
+                    const particleGeometry = new THREE.BufferGeometry();
+                    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                    particleMaterial = new THREE.PointsMaterial({
+                        size: 0.05,
+                        vertexColors: true,
+                        transparent: true,
+                        blending: THREE.AdditiveBlending, // For glowing effect
+                        sizeAttenuation: true // Particles closer to camera appear larger
+                    });
+
+                    particles = new THREE.Points(particleGeometry, particleMaterial);
+                    scene.add(particles);
+
+                    // Animation loop
+                    const animate = () => {
+                        animationFrameId = requestAnimationFrame(animate);
+
+                        // Smooth camera movement based on mouse
+                        targetX.current += (mouseX.current - targetX.current) * 0.02;
+                        targetY.current += (mouseY.current - targetY.current) * 0.02;
+
+                        camera.position.x = -targetX.current * 0.5;
+                        camera.position.y = targetY.current * 0.5;
+                        camera.lookAt(scene.position);
+
+                        // Rotate particles subtly
+                        particles.rotation.x += 0.0005;
+                        particles.rotation.y += 0.0008;
+
+                        renderer.render(scene, camera);
+                    };
+
+                    animate();
+
+                    // Handle window resize
+                    const onWindowResize = () => {
+                        const newWidth = window.innerWidth;
+                        const newHeight = window.innerHeight;
+                        camera.aspect = newWidth / newHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(newWidth, newHeight);
+                    };
+
+                    window.addEventListener('resize', onWindowResize);
+                    window.addEventListener('mousemove', handleMouseMove);
+
+
+                    // Cleanup
+                    return () => {
+                        cancelAnimationFrame(animationFrameId);
+                        window.removeEventListener('resize', onWindowResize);
+                        window.removeEventListener('mousemove', handleMouseMove);
+                        if (mountRef.current && renderer.domElement) {
+                            mountRef.current.removeChild(renderer.domElement);
+                        }
+                        // Dispose Three.js objects to free memory
+                        scene.traverse(object => {
+                            if (object.isMesh) {
+                                object.geometry.dispose();
+                                object.material.dispose();
+                            }
+                        });
+                        renderer.dispose();
+                    };
+                };
+
+                // Initialize Three.js when the component mounts
+                if (mountRef.current) {
+                    init();
+                }
+
+            }, [handleMouseMove]); // Re-run effect if handleMouseMove changes (though it's stable)
+
+            return <div ref={mountRef} className="absolute inset-0 z-0"></div>;
+        };
+
+
+        // Main App component
+        const App = () => {
+            const [isNavOpen, setIsNavOpen] = useState(false);
+
+            const scrollToSection = (id) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                    setIsNavOpen(false);
+                }
+            };
+
+            const useAnimateOnScroll = (threshold = 0.1) => {
+                const [elementsInView, setElementsInView] = useState({});
+                const observer = useRef(null);
+
+                useEffect(() => {
+                    observer.current = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            setElementsInView(prev => ({
+                                ...prev,
+                                [entry.target.id]: entry.isIntersecting
+                            }));
+                        });
+                    }, { threshold });
+
+                    const elementsToObserve = document.querySelectorAll('.animated-section-on-scroll');
+                    elementsToObserve.forEach(el => observer.current.observe(el));
+
+                    return () => {
+                        if (observer.current) {
+                            observer.current.disconnect();
+                        }
+                    };
+                }, [threshold]);
+
+                const registerElement = (element) => {
+                    if (element && observer.current) {
+                        observer.current.observe(element);
+                    }
+                };
+
+                return { elementsInView, registerElement };
+            };
+
+            const { elementsInView, registerElement } = useAnimateOnScroll();
+
+            // D3.js Animated Circle Component
+            const D3AnimatedCircle = ({ percentage, label, subLabel, id }) => {
+                const svgRef = useRef();
+                const containerRef = useRef();
+
+                const [shouldAnimateD3, setShouldAnimateD3] = useState(false);
+
+                useEffect(() => {
+                    const currentContainer = containerRef.current;
+                    if (!currentContainer) return;
+
+                    const d3Observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting && entry.target.id === id) {
+                                setShouldAnimateD3(true);
+                                d3Observer.unobserve(entry.target);
+                            }
+                        });
+                    }, { threshold: 0.5 });
+
+                    d3Observer.observe(currentContainer);
+
+                    return () => {
+                        if (d3Observer) {
+                            d3Observer.disconnect();
+                        }
+                    };
+                }, [id]);
+
+                useEffect(() => {
+                    if (!shouldAnimateD3) return;
+
+                    const width = 180;
+                    const height = 180;
+                    const radius = Math.min(width, height) / 2 - 10;
+                    const borderWidth = 12;
+
+                    const svg = d3.select(svgRef.current)
+                        .attr("width", width)
+                        .attr("height", height)
+                        .attr("viewBox", `0 0 ${width} ${height}`)
+                        .style("display", "block")
+                        .style("margin", "auto");
+
+                    svg.selectAll("*").remove();
+
+                    const g = svg.append("g")
+                        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+                    g.append("circle")
+                        .attr("r", radius)
+                        .attr("fill", "none")
+                        .attr("stroke", "#e0e7ff")
+                        .attr("stroke-width", borderWidth);
+
+                    const arc = d3.arc()
+                        .innerRadius(radius)
+                        .outerRadius(radius)
+                        .startAngle(0)
+                        .endAngle(0);
+
+                    const path = g.append("path")
+                        .datum({ endAngle: 0 })
+                        .attr("fill", "none")
+                        .attr("stroke", "#4f46e5")
+                        .attr("stroke-width", borderWidth)
+                        .attr("stroke-linecap", "round")
+                        .attr("d", arc);
+
+                    const text = g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", "-0.2em")
+                        .attr("class", "d3-circle-label")
+                        .text("0%");
+
+                    const subText = g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", "1.2em")
+                        .attr("class", "d3-circle-sublabel")
+                        .text(subLabel);
+
+                    const interpolate = d3.interpolate(0, (percentage / 100) * 2 * Math.PI);
+
+                    path.transition()
+                        .duration(1500)
+                        .ease(d3.easeCubicOut)
+                        .attrTween("d", function(d) {
+                            return function(t) {
+                                d.endAngle = interpolate(t);
+                                return arc(d);
+                            };
+                        });
+
+                    text.transition()
+                        .duration(1500)
+                        .ease(d3.easeCubicOut)
+                        .tween("text", function() {
+                            const that = d3.select(this);
+                            const i = d3.interpolateRound(0, percentage);
+                            return function(t) {
+                                that.text(i(t) + label);
+                            };
+                        });
+
+                }, [percentage, label, subLabel, shouldAnimateD3]);
+
+                return (
+                    <div id={id} className="d3-circle-container" ref={containerRef}>
+                        <svg ref={svgRef}></svg>
+                    </div>
+                );
+            };
+
+
+            return (
+                <div className="min-h-screen bg-gray-50 font-inter antialiased text-gray-800">
+                    {/* Navigation */}
+                    <nav className="fixed w-full z-50 bg-white shadow-md py-4 rounded-b-xl">
+                        <div className="container mx-auto px-6 flex justify-between items-center">
+                            <div className="text-2xl font-bold text-indigo-700">Dippa Kumari</div>
+                            {/* Desktop Nav Links */}
+                            <div className="hidden md:flex space-x-8">
+                                <button onClick={() => scrollToSection('hero')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Home</button>
+                                <button onClick={() => scrollToSection('about')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">About</button>
+                                <button onClick={() => scrollToSection('experience')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Experience</button>
+                                <button onClick={() => scrollToSection('skills')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Skills</button>
+                                <button onClick={() => scrollToSection('projects')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Projects</button>
+                                <button onClick={() => scrollToSection('contact')} className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200">Contact</button>
+                            </div>
+                            {/* Mobile Menu Button */}
+                            <button className="md:hidden p-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" onClick={() => setIsNavOpen(!isNavOpen)}>
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    {isNavOpen ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                                    )}
+                                </svg>
+                            </button>
+                        </div>
+                        {/* Mobile Nav Links (Conditional Rendering) */}
+                        {isNavOpen && (
+                            <div className="md:hidden mt-4 px-6 pb-4 space-y-4 text-center">
+                                <button onClick={() => scrollToSection('hero')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">Home</button>
+                                <button onClick={() => scrollToSection('about')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">About</button>
+                                <button onClick={() => scrollToSection('experience')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">Experience</button>
+                                <button onClick={() => scrollToSection('skills')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">Skills</button>
+                                <button onClick={() => scrollToSection('projects')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">Projects</button>
+                                <button onClick={() => scrollToSection('contact')} className="block w-full text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 py-2 rounded-md bg-gray-50">Contact</button>
+                            </div>
+                        )}
+                    </nav>
+
+                    {/* Hero Section */}
+                    <section id="hero" className="relative pt-24 pb-16 md:pt-40 md:pb-24 bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center min-h-screen-70 rounded-b-3xl shadow-xl overflow-hidden">
+                        {/* Three.js Canvas Background */}
+                        <ThreeJSCanvas />
+
+                        <div className="container mx-auto px-6 text-center z-10 relative"> {/* z-10 to bring content to front */}
+                            <img
+                                src="https://placehold.co/150x150/FFFFFF/3B82F6?text=DK"
+                                alt="Dippa Kumari Profile"
+                                className="rounded-full w-36 h-36 mx-auto mb-6 border-4 border-white shadow-lg object-cover hero-section-image-animation"
+                            />
+                            <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-4 animate-fade-in-down">
+                                Dippa Kumari
+                            </h1>
+                            <p className="text-xl md:text-2xl font-light mb-8 opacity-95 animate-fade-in-up">
+                                Detail-Oriented <span className="font-semibold">QA Test Engineer</span> with 4.5+ Years of Expertise
+                            </p>
+                            <p className="max-w-3xl mx-auto text-lg mb-10 opacity-90 animate-fade-in-up delay-200">
+                                Passionate about ensuring software quality through rigorous manual and automated testing, driving product enhancements, and delivering high-quality solutions within tight deadlines.
+                            </p>
+                            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 animate-fade-in-up delay-400">
+                                <button
+                                    onClick={() => scrollToSection('contact')}
+                                    className="bg-white text-indigo-700 hover:bg-indigo-100 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition duration-300 ease-in-out"
+                                >
+                                    Get in Touch
+                                </button>
+                                <a
+                                    href="https://www.linkedin.com/in/dippa-kumari"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-indigo-700 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition duration-300 ease-in-out flex items-center justify-center"
+                                >
+                                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fillRule="evenodd" d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.75A1.75 1.75 0 118.25 5 1.75 1.75 0 016.5 6.75zM19 19h-3v-5.625c0-3.36-4-3.5-4 0V19H8V8h3v1.75h.25c.412-.86 1.73-1.75 3.75-1.75 4 0 4.75 2.75 4.75 6.75V19z" clipRule="evenodd" />
+                                    </svg>
+                                    LinkedIn Profile
+                                </a>
+                            </div>
+                        </div>
+                        {/* Background SVG Wave (Kept for stylistic depth) */}
+                        <svg className="absolute bottom-0 left-0 w-full h-auto text-white opacity-20 z-0" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                            <path fill="currentColor" fillOpacity="1" d="M0,192L60,197.3C120,203,240,213,360,202.7C480,192,600,160,720,165.3C840,171,960,213,1080,218.7C1200,224,1320,192,1380,176L1440,160L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"></path>
+                        </svg>
+                    </section>
+
+                    {/* About Section */}
+                    <section id="about" className={`py-16 md:py-24 bg-white rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['about'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
+                        <div className="container mx-auto px-6 max-w-4xl flex flex-col md:flex-row items-center gap-10">
+                            <div className="md:w-1/3 flex justify-center">
+                                {/* Dippa Kumari's Photo */}
+                                <img
+                                    src="uploaded:image_aa7c33.jpg-fb4ad68a-4925-4012-aa4d-40fa55944ddf"
+                                    alt="Dippa Kumari Personal Photo"
+                                    class="rounded-full w-48 h-48 md:w-64 md:h-64 object-cover border-4 border-indigo-300 shadow-xl"
+                                />
+                            </div>
+                            <div className="md:w-2/3 text-center md:text-left">
+                                <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">About Me</h2>
+                                <div className="text-lg text-gray-700 leading-relaxed space-y-6">
+                                    <p>
+                                        As a <span className="font-semibold text-indigo-600">Detail-oriented QA Tester</span> with 4.5+ years of experience, I am dedicated to ensuring software quality through rigorous manual and automated testing. My expertise lies in crafting and executing comprehensive test cases, identifying critical defects, and driving product enhancements.
+                                    </p>
+                                    <p>
+                                        I am highly skilled in <span className="font-semibold text-indigo-600">regression testing, performance testing, and adhering to industry best practices.</span> I possess a strong ability to collaborate effectively with cross-functional teams, ensuring the delivery of high-quality software within tight deadlines. I am committed to staying updated with emerging testing methodologies to optimize processes and results.
+                                    </p>
+                                    <p>
+                                        My background includes a <span className="font-semibold text-indigo-600">Bachelor's in Electronics and Communication Engineering</span>, providing me with a strong analytical foundation. I am proficient in various programming languages, frameworks, and tools, enabling me to contribute effectively to diverse technical environments.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Work Experience Section */}
+                    <section id="experience" className="py-16 md:py-24 bg-gray-100 rounded-xl mx-4 my-8 shadow-lg">
+                        <div className="container mx-auto px-6 max-w-4xl">
+                            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900">Work Experience</h2>
+
+                            {/* Software Test Engineer - TCS */}
+                            <div id="exp-tcs-software" className={`relative mb-12 pb-8 last:mb-0 last:pb-0 before:absolute before:left-3 before:top-0 before:h-full before:w-1 before:bg-indigo-300 before:rounded-full md:before:left-1/2 md:before:-translate-x-1/2 animated-section-on-scroll ${elementsInView['exp-tcs-software'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
+                                <div className="flex flex-col md:flex-row items-center md:items-start text-center md:text-left">
+                                    <div className="md:w-1/2 md:pr-10">
+                                        <div className="bg-indigo-600 text-white py-2 px-4 rounded-full text-sm font-semibold mb-3 md:mb-0 inline-block">
+                                            Feb. 2021 – Present
+                                        </div>
+                                    </div>
+                                    <div className="md:w-1/2 md:pl-10 relative">
+                                        <div className="absolute left-0 top-0 h-5 w-5 bg-indigo-600 rounded-full border-4 border-white -translate-x-1/2 md:left-auto md:right-auto md:top-1/2 md:-translate-y-1/2 md:left-[-1.75rem] transform"></div>
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Software Test Engineer</h3>
+                                        <p className="text-lg text-indigo-700 mb-3">TATA CONSULTANCY SERVICES, INDIA</p>
+                                        <ul className="list-disc list-inside text-gray-700 text-base space-y-2">
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-100' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                Improved product quality ratings by <span className="font-semibold">30%</span> through early bug detection.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-200' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                                                Spearheaded development of automated test scripts using <span className="font-semibold">Java, Selenium</span>, reducing manual testing by <span className="font-semibold">40%</span> and execution time by <span className="font-semibold">30%</span>.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-300' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                Automated repetitive test cases with Selenium and <span className="font-semibold">Robot Framework</span>, enhancing efficiency and reliability.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-400' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 13v-1a2 2 0 00-2-2H5a2 2 0 00-2 2v1m10 8V8l5-5m1 2a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h4" /></svg>
+                                                Conducted comprehensive regression tests, created detailed test plans, and tracked results for continuous improvement.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-500' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3m0 0l3-3m-3 3v4m0 16a9 9 0 110-18 9 9 0 010 18z" /></svg>
+                                                Performed functional and non-functional <span className="font-semibold">API testing using Postman</span>, including performance, compatibility, and security.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-600' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-pink-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                                Planned and executed performance and load testing using <span className="font-semibold">Apache JMeter</span>.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-software'] ? 'animate li-delay-700' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                Documented bugs thoroughly in <span className="font-semibold">Jira</span> and collaborated with teams for defect resolution.
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Manual Mainframe Tester - TCS */}
+                            <div id="exp-tcs-mainframe" className={`relative mb-12 pb-8 last:mb-0 last:pb-0 before:absolute before:left-3 before:top-0 before:h-full before:w-1 before:bg-indigo-300 before:rounded-full md:before:left-1/2 md:before:-translate-x-1/2 animated-section-on-scroll ${elementsInView['exp-tcs-mainframe'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
+                                <div className="flex flex-col md:flex-row items-center md:items-start text-center md:text-left">
+                                    <div className="md:w-1/2 md:order-2 md:pl-10">
+                                        <div className="bg-indigo-600 text-white py-2 px-4 rounded-full text-sm font-semibold mb-3 md:mb-0 inline-block">
+                                            (Within TCS - Concurrent Role)
+                                        </div>
+                                    </div>
+                                    <div className="md:w-1/2 md:order-1 md:pr-10 relative">
+                                        <div className="absolute left-0 top-0 h-5 w-5 bg-indigo-600 rounded-full border-4 border-white -translate-x-1/2 md:left-auto md:right-auto md:top-1/2 md:-translate-y-1/2 md:right-[-1.75rem] transform"></div>
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Manual Mainframe Tester</h3>
+                                        <p className="text-lg text-indigo-700 mb-3">TATA CONSULTANCY SERVICES, INDIA</p>
+                                        <ul className="list-disc list-inside text-gray-700 text-base space-y-2">
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-mainframe'] ? 'animate li-delay-100' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-1.25-3M15 10V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v5m5 0h.01M12 12h.01M9 12h.01M19 6l-2-2m-3-1l-2 2m-2-2l-2 2M3 8a2 2 0 00-2 2v8a2 2 0 002 2h18a2 2 0 002-2v-8a2 2 0 00-2-2H3z" /></svg>
+                                                1.2 years of experience testing mainframe applications for reliability, performance, and quality.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-mainframe'] ? 'animate li-delay-200' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                                                Proficient in functional, regression, and integration testing.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-tcs-mainframe'] ? 'animate li-delay-300' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                                Strong understanding of mainframe systems, JCL, and CICS screens.
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Drafting Engineer - CONGRUEX ASIAN PACIFIC LLP */}
+                            <div id="exp-congruex" className={`relative mb-12 pb-8 last:mb-0 last:pb-0 before:absolute before:left-3 before:top-0 before:h-full before:w-1 before:bg-indigo-300 before:rounded-full md:before:left-1/2 md:before:-translate-x-1/2 animated-section-on-scroll ${elementsInView['exp-congruex'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
+                                <div className="flex flex-col md:flex-row items-center md:items-start text-center md:text-left">
+                                    <div className="md:w-1/2 md:pr-10">
+                                        <div className="bg-indigo-600 text-white py-2 px-4 rounded-full text-sm font-semibold mb-3 md:mb-0 inline-block">
+                                            Nov. 2020 – Feb. 2021
+                                        </div>
+                                    </div>
+                                    <div className="md:w-1/2 md:pl-10 relative">
+                                        <div className="absolute left-0 top-0 h-5 w-5 bg-indigo-600 rounded-full border-4 border-white -translate-x-1/2 md:left-auto md:right-auto md:top-1/2 md:-translate-y-1/2 md:left-[-1.75rem] transform"></div>
+                                        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Drafting Engineer</h3>
+                                        <p className="text-lg text-indigo-700 mb-3">CONGRUEX ASIAN PACIFIC LLP, INDIA</p>
+                                        <ul className="list-disc list-inside text-gray-700 text-base space-y-2">
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-congruex'] ? 'animate li-delay-100' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                                Worked in the telecommunication domain, performing precise full-field measurements.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-congruex'] ? 'animate li-delay-200' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-lime-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                                Improved accuracy of material parameters.
+                                            </li>
+                                            <li className={`flex items-center animated-list-item ${elementsInView['exp-congruex'] ? 'animate li-delay-300' : ''}`}>
+                                                <svg className="h-5 w-5 mr-2 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" /></svg>
+                                                Worked with ARAMIS Software and updated it with existing changes.
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Skills Section */}
+                    <section id="skills" className={`py-16 md:py-24 bg-white rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['skills'] ? 'is-visible fade-in' : ''}`} ref={el => registerElement(el)}>
+                        <div className="container mx-auto px-6 max-w-4xl">
+                            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900 flex items-center justify-center">
+                                Skills & Expertise
+                                <svg className="h-8 w-8 ml-3 text-indigo-500 animate-bounce-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                            </h2>
+
+                            {/* D3.js Experience Visualizer */}
+                            <D3AnimatedCircle
+                                percentage={90} /* Representing high proficiency/experience */
+                                label="%"
+                                subLabel="Overall QA Proficiency"
+                                id="d3-experience-circle"
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {/* Skill Category: Programming Languages */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
+                                        Programming Languages
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Core Java</li>
+                                        <li>SQL</li>
+                                        <li>Python</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Frameworks */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3m0 0l3-3m-3 3v4m0 16a9 9 0 110-18 9 9 0 010 18z" />
+                                        </svg>
+                                        Frameworks
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Cucumber</li>
+                                        <li>Robot Framework</li>
+                                        <li>Brootframework</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Databases */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10l2 2h10l2-2V7m-2 0H6m2 0V5a2 2 0 012-2h4a2 2 0 012 2v2m-6 0h6m-6 0h.01M6 7H4m8 0h.01M6 7V5a2 2 0 00-2-2H4a2 2 0 00-2 2v2" />
+                                        </svg>
+                                        Databases
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Hive</li>
+                                        <li>MySQL</li>
+                                        <li>Redshift</li>
+                                        <li>PostgreSQL</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Cloud */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                                        </svg>
+                                        Cloud
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>AWS (EC2, S3, AWS Billing)</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Software Tools */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                        </svg>
+                                        Software Tools
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Jira</li>
+                                        <li>Microsoft Azure DevOps</li>
+                                        <li>Selenium with Java</li>
+                                        <li>IBM workload scheduler (TEWOLI)</li>
+                                        <li>POSTMAN</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: IDEs */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                                        </svg>
+                                        IDES
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Eclipse</li>
+                                        <li>DBeaver</li>
+                                        <li>Pycharm</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Languages */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 8a8 8 0 01-8-8c0-2.426 1.408-4.52 3.447-5.553L12 3l.553 1.447C14.592 7.48 16 9.574 16 12a8 8 0 01-8 8z" />
+                                        </svg>
+                                        Languages
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>English (Full professional proficiency)</li>
+                                        <li>German (Elementary Level - A1)</li>
+                                    </ul>
+                                </div>
+                                {/* Skill Category: Certifications */}
+                                <div className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
+                                    <h3 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.008 12.008 0 002.95 12c0 1.988.356 3.92 1.026 5.764.931 2.502 2.766 4.606 4.957 6.007l.42-.252c2.09-1.254 3.792-3.32 4.723-5.717.67-1.844 1.026-3.776 1.026-5.764a12.008 12.008 0 00-.001-3.04z" />
+                                        </svg>
+                                        Licenses & Certifications
+                                    </h3>
+                                    <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                        <li>Learn Selenium with Java Cucumber & Frameworks</li>
+                                        <li>Scrum Master™</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Projects Section */}
+                    <section id="projects" className={`py-16 md:py-24 bg-gray-100 rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['projects'] ? 'is-visible fade-in' : ''}`} ref={el => registerElement(el)}>
+                        <div className="container mx-auto px-6 max-w-4xl">
+                            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900">Key Projects & Domains</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Project 1: Life Science Domain - Bayer AG */}
+                                <div className="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                                    <h3 className="text-2xl font-semibold text-indigo-700 mb-4">Life Science Domain: Bayer AG</h3>
+                                    <p className="text-gray-700 leading-relaxed mb-4">
+                                        Involved in testing for Bayer AG, a multinational pharmaceutical and life sciences company. Focused on ensuring data integrity and product quality in drug development and clinical trials.
+                                    </p>
+                                    <ul className="list-disc list-inside text-gray-600 text-base space-y-1">
+                                        <li>Key testing roles: ETL, infrastructure, and product testing.</li>
+                                        <li>Ensured data integrity and product quality from data-rich reports.</li>
+                                    </ul>
+                                </div>
+
+                                {/* Project 2: Insurance Domain - AVIVA */}
+                                <div className="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                                    <h3 className="text-2xl font-semibold text-indigo-700 mb-4">Insurance Domain: AVIVA</h3>
+                                    <p className="text-gray-700 leading-relaxed mb-4">
+                                        Contributed to testing for Aviva, a multinational insurance company, providing a wide range of insurance, wealth management, and retirement solutions.
+                                    </p>
+                                    <ul className="list-disc list-inside text-gray-600 text-base space-y-1">
+                                        <li>Roles included: Automation test, Data testing, ETL testing, Regression testing, End-to-end testing.</li>
+                                    </ul>
+                                </div>
+
+                                {/* Project 3: Insurance Domain - Generali Vitality */}
+                                <div className="bg-white p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                                    <h3 className="text-2xl font-semibold text-indigo-700 mb-4">Insurance Domain: Generali Vitality</h3>
+                                    <p className="text-gray-700 leading-relaxed mb-4">
+                                        Involved in a digital health and wellness program, Generali Vitality, that integrates with insurance products to promote healthier living.
+                                    </p>
+                                    <ul className="list-disc list-inside text-gray-600 text-base space-y-1">
+                                        <li>Key responsibilities: DDL validation, functional validation, Data Validation.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Education Section */}
+                    <section id="education" className={`py-16 md:py-24 bg-white rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['education'] ? 'is-visible slide-up' : ''}`} ref={el => registerElement(el)}>
+                        <div className="container mx-auto px-6 max-w-4xl text-center">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Education</h2>
+                            <div className="bg-gray-50 p-8 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+                                <h3 className="text-2xl font-semibold text-indigo-700 mb-2">Bachelor in Electronics and Communication Engineering</h3>
+                                <p className="text-lg text-gray-800 mb-3">TECHNOCRATS INSTITUTE OF TECHNOLOGY, Bhopal India</p>
+                                <p className="text-md text-gray-600 mb-4">August 2016 to June 2020 (CGPA: 8.62)</p>
+                                <p className="text-gray-700">
+                                    <span className="font-semibold">Important Modules:</span> Artificial Intelligence, Microprocessor and Interfacing, Probability and Statistics, Database Management, Computer Architecture, Operating Systems, Compiler Design.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Contact Section */}
+                    <section id="contact" className={`py-16 md:py-24 bg-gradient-to-br from-purple-600 to-pink-700 text-white rounded-xl mx-4 my-8 shadow-lg animated-section-on-scroll ${elementsInView['contact'] ? 'is-visible fade-in' : ''}`} ref={el => registerElement(el)}>
+                        <div className="container mx-auto px-6 text-center max-w-3xl">
+                            <h2 className="text-3xl md:text-4xl font-bold mb-6">Let's Connect!</h2>
+                            <p className="text-lg md:text-xl mb-10 opacity-90">
+                                I'm always open to discussing new projects, collaboration opportunities, or answering any questions you might have.
+                            </p>
+                            <div className="flex flex-col items-center space-y-6">
+                                <a
+                                    href="mailto:kumaridippabgs@gmail.com"
+                                    className="bg-white text-purple-700 hover:bg-purple-100 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition duration-300 ease-in-out flex items-center"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    kumaridippabgs@gmail.com
+                                </a>
+                                <a
+                                    href="tel:+917223068401"
+                                    className="bg-white text-purple-700 hover:bg-purple-100 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition duration-300 ease-in-out flex items-center"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                    </svg>
+                                    (+91) 7223068401
+                                </a>
+                                <a
+                                    href="https://www.linkedin.com/in/dippa-kumari"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-white text-purple-700 hover:bg-purple-100 font-bold py-3 px-8 rounded-full shadow-lg transform hover:scale-105 transition duration-300 ease-in-out flex items-center"
+                                >
+                                    <svg className="h-6 w-6 mr-3" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path fillRule="evenodd" d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.75A1.75 1.75 0 118.25 5 1.75 1.75 0 016.5 6.75zM19 19h-3v-5.625c0-3.36-4-3.5-4 0V19H8V8h3v1.75h.25c.412-.86 1.73-1.75 3.75-1.75 4 0 4.75 2.75 4.75 6.75V19z" clipRule="evenodd" />
+                                    </svg>
+                                    LinkedIn Profile
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Footer */}
+                    <footer className="bg-gray-900 text-gray-400 py-8 text-center rounded-t-xl shadow-inner">
+                        <div className="container mx-auto px-6">
+                            <p>&copy; 2025 Dippa Kumari. All rights reserved.</p>
+                            <p className="mt-2">
+                                Designed with Passion by Gemini AI
+                            </p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        // Render the React App component into the 'root' div
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
